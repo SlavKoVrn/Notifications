@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: notification_service_app
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./:/var/www
+    networks:
+      - notif_net
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+    environment:
+      - DB_HOST=postgres
+      - REDIS_HOST=redis
+      - QUEUE_CONNECTION=rabbitmq
+      - RABBITMQ_HOST=rabbitmq
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: notif_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: notifications
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    networks:
+      - notif_net
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: notif_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - notif_net
+
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: notif_rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - notif_net
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: notification_service_worker
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./:/var/www
+    command: php artisan queue:work --queue=notifications_transactional,notifications_marketing --sleep=3 --tries=3 --max-time=3600
+    networks:
+      - notif_net
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+
+networks:
+  notif_net:
+    driver: bridge
+
+volumes:
+  pgdata:
