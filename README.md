@@ -64,6 +64,88 @@ docker-compose.
 Ждем твое решение!
 ```
 
+## Документация API (OpenAPI / Swagger)
+
+#### спецификация OpenAPI 3.0.
+
+```yaml
+openapi: 3.0.0
+info:
+  title: Notification Service API
+  version: 1.0.0
+paths:
+  /api/v1/notifications/bulk:
+    post:
+      summary: Массовая отправка уведомлений
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [request_id, channel, priority, message, recipients]
+              properties:
+                request_id:
+                  type: string
+                  description: Уникальный ID запроса для идемпотентности
+                  example: "batch-xyz-789"
+                channel:
+                  type: string
+                  enum: [sms, email]
+                priority:
+                  type: string
+                  enum: [transactional, marketing]
+                message:
+                  type: string
+                  example: "Ваш код подтверждения: 4591"
+                recipients:
+                  type: array
+                  items:
+                    type: string
+                  example: ["+79001234567", "+79007654321"]
+      responses:
+        '202':
+          description: Запрос принят в обработку
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  accepted:
+                    type: integer
+                  total_requested:
+                    type: integer
+  /api/v1/notifications/{recipient_id}/history:
+    get:
+      summary: История и статусы уведомлений подписчика
+      parameters:
+        - name: recipient_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        channel: { type: string }
+                        status: { type: string, enum: [queued, sent, delivered, failed] }
+                        priority: { type: string }
+                        created_at: { type: string, format: date-time }
+```
+
 <p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
 <p align="center">
