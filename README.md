@@ -146,6 +146,67 @@ paths:
                         created_at: { type: string, format: date-time }
 ```
 
+## 🏃‍♂️ Пошаговый запуск
+
+#### 1. Клонируйте репозиторий:
+
+```bash
+git clone https://github.com/SlavKoVrn/Notifications notification-service
+cd notification-service
+```
+
+#### 2. Скопируйте файл окружения:
+```bash
+cp .env.example .env
+
+# Database (PostgreSQL)
+DB_CONNECTION=pgsql
+DB_HOST=postgres
+DB_PORT=5432
+DB_DATABASE=notifications
+DB_USERNAME=user
+DB_PASSWORD=password
+
+# Redis
+REDIS_HOST=redis
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+
+# Queue (RabbitMQ)
+QUEUE_CONNECTION=rabbitmq
+RABBITMQ_HOST=rabbitmq
+RABBITMQ_PORT=5672
+RABBITMQ_LOGIN=guest
+RABBITMQ_PASSWORD=guest
+RABBITMQ_VHOST=/
+
+*(Убедитесь, что в `.env` указаны `QUEUE_CONNECTION=rabbitmq`, `DB_CONNECTION=pgsql`)*
+```
+
+#### 3. Запустите всю инфраструктуру одной командой:
+```bash
+docker-compose up -d --build
+```
+
+#### 4. Установите зависимости PHP и сгенерируйте ключ приложения (выполнить внутри контейнера `notification_service_app`):
+```bash
+docker exec -it notification_service_app bash
+composer install
+php artisan key:generate
+```
+
+#### 5. Выполните миграции БД:
+```bash
+docker exec -it notification_service_app bash
+php artisan migrate
+```
+
+#### 6. Запустите интеграционные тесты:
+```bash
+docker exec -it notification_service_app bash
+php artisan test
+```
+
 <p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
 <p align="center">
