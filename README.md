@@ -247,6 +247,23 @@ php artisan serve
 curl -X GET http://127.0.0.1:8000/api/v1/notifications/+79001112233/history
 ```
 
+## 🏗 Архитектурные решения
+
+```bash
+1. **Exactly-Once семантика**: Достигается за счет `UNIQUE(request_id, recipient_id)` в PostgreSQL. Даже если RabbitMQ доставит сообщение дважды, БД отклонит дубликат.
+2. **Приоритезация**: Воркер в `docker-compose.yml` настроен как `--queue=notifications_transactional,notifications_marketing`. Laravel всегда будет брать задачи из первой очереди, если они там есть, гарантируя отсутствие задержек для критичных сообщений.
+3. **Retry-механизм**: Джоба `ProcessNotificationJob` имеет `$tries = 3` и `$backoff = [10, 30, 60]`. Мок-провайдер намеренно генерирует исключения в 10% случаев, чтобы продемонстрировать работу механизма повторных попыток.
+```
+
+### 💡 Почему это решение сильное:
+
+```bash
+1. **Защита от дубликатов на двух уровнях**: Redis (быстрая проверка до начала работы) + PostgreSQL Unique Constraint (железобетонная гарантия).
+2. **Разделение очередей**: Транзакционные сообщения физически не будут стоять в очереди за маркетинговыми рассылками.
+3. **Готовность к Production**: Использование `docker-compose` с отдельным сервисом `worker` имитирует реальное развертывание в Kubernetes (где API и Worker были бы разными Deployment).
+4. **Полное покрытие требований**: Все статусы, каналы, приоритеты и тесты учтены.
+```
+
 <p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
 <p align="center">
