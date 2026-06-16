@@ -29,7 +29,10 @@ class NotificationFlowTest extends TestCase {
                  ->assertJson(['accepted' => 2]);
 
         // Проверяем, что джобы отправлены в правильную очередь
-        Queue::assertPushedOn('notifications_transactional', ProcessNotificationJob::class, 2);
+        Queue::assertPushedOn('notifications_transactional', ProcessNotificationJob::class);
+
+        // Проверяем, что джоба была отправлена ровно 2 раза
+        Queue::assertPushed(ProcessNotificationJob::class, 2);
 
         // Проверяем запись в БД
         $this->assertDatabaseCount('notifications', 2);
