@@ -207,6 +207,46 @@ docker exec -it notification_service_app bash
 php artisan test
 ```
 
+## 🧪 Тестирование API 
+
+### 1. Массовая отправка (Transactional)
+```bash
+docker exec -it notification_service_app bash
+php artisan serve
+curl -X POST http://127.0.0.1:8000/api/v1/notifications/bulk \
+  -H "Content-Type: application/json" \
+  -d '{
+    "request_id": "req-001",
+    "channel": "sms",
+    "priority": "transactional",
+    "message": "Ваш код: 9921",
+    "recipients": ["+79001112233", "+79004445566"]
+  }'
+```
+
+### 2. Проверка идемпотентности (повторный запрос с тем же `request_id`)
+```bash
+docker exec -it notification_service_app bash
+php artisan serve
+curl -X POST http://127.0.0.1:8000/api/v1/notifications/bulk \
+  -H "Content-Type: application/json" \
+  -d '{
+    "request_id": "req-001",
+    "channel": "sms",
+    "priority": "transactional",
+    "message": "Ваш код: 9921",
+    "recipients": ["+79001112233"]
+  }'
+# Ответ покажет accepted: 0, так как запись с таким request_id и получателем уже существует
+```
+
+### 3. Получение истории статусов
+```bash
+docker exec -it notification_service_app bash
+php artisan serve
+curl -X GET http://127.0.0.1:8000/api/v1/notifications/+79001112233/history
+```
+
 <p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
 <p align="center">
