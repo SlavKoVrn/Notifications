@@ -64,4 +64,71 @@ class NotificationFlowTest extends TestCase {
         $notification->refresh();
         $this->assertEquals('queued', $notification->status);
     }
+
+    public function test_recipient_notification_history() {
+        $recipientId = '+79001234567';
+
+        // 1. Создаем уведомления для целевого получателя
+        Notification::create([
+            'request_id' => 'req-hist-1',
+            'recipient_id' => $recipientId,
+            'channel' => 'sms',
+            'message' => 'Test message 1',
+            'status' => 'sent',
+            'priority' => 'transactional'
+        ]);
+
+        Notification::create([
+            'request_id' => 'req-hist-2',
+            'recipient_id' => $recipientId,
+            'channel' => 'email',
+            'message' => 'Test message 2',
+            'status' => 'delivered',
+            'priority' => 'marketing'
+        ]);
+
+        // 2. Создаем уведомление для другого получателя (оно не должно попасть в выдачу)
+        Notification::create([
+            'request_id' => 'req-hist-3',
+            'recipient_id' => '+79009999999',
+            'channel' => 'sms',
+            'message' => 'Other user message',
+            'status' => 'queued',
+            'priority' => 'transactional'
+        ]);
+
+        // 3. Выполняем GET запрос к эндпоинту
+        $response = $this->getJson("/api/v1/notifications/{$recipientId}/history");
+
+        // 4. Проверяем HTTP статус и структуру ответа согласно OpenAPI спецификации
+        $response->assertStatus(200)
+                 ->assertJsonStructure([
+                     'data' => [
+                         '*' => [
+                             'id',
+                             'channel',
+                             'status',
+                             'priority',
+                             'created_at'
+                         ]
+                     ]
+                 ]);
+
+        // 5. Проверяем количество записей (должно вернуться ровно 2)
+        $response->assertJsonCount(2, 'data');
+
+        // 6. Проверяем, что в выдачу попали правильные уведомления с нужными данными
+        $response->assertJsonFragment([
+            'channel' => 'sms',
+            'status' => 'sent',
+            'priority' => 'transactional'
+        ]);
+
+        $response->assertJsonFragment([
+            'channel' => 'email',
+            'status' => 'delivered',
+            'priority' => 'marketing'
+        ]);
+    }
+
 }
