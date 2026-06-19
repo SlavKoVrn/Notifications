@@ -1,11 +1,11 @@
 version: '3.8'
 
 services:
-  app:
+  worker:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: notification_service_app
+    container_name: notification_service_worker
     restart: unless-stopped
     working_dir: /var/www
     volumes:
@@ -21,6 +21,7 @@ services:
       - REDIS_HOST=redis
       - QUEUE_CONNECTION=rabbitmq
       - RABBITMQ_HOST=rabbitmq
+    command: php artisan queue:work --queue=notifications_transactional,notifications_marketing --sleep=60 --tries=3 --max-time=3600
 
   postgres:
     image: postgres:15-alpine
@@ -58,23 +59,6 @@ services:
       RABBITMQ_DEFAULT_PASS: guest
     networks:
       - notif_net
-
-  worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: notification_service_worker
-    restart: unless-stopped
-    working_dir: /var/www
-    volumes:
-      - ./:/var/www
-    command: php artisan queue:work --queue=notifications_transactional,notifications_marketing --sleep=3 --tries=3 --max-time=3600
-    networks:
-      - notif_net
-    depends_on:
-      - postgres
-      - redis
-      - rabbitmq
 
 networks:
   notif_net:

@@ -19,9 +19,7 @@ class ProcessNotificationJob implements ShouldQueue {
     public $tries = 3;
     public $backoff = [10, 30, 60]; // Экспоненциальная задержка
 
-    public function __construct(
-        public int $notificationId
-    ) {}
+    public function __construct(public int $notificationId) {}
 
     public function handle(NotificationProviderInterface $provider, IdempotencyService $idempotency) {
         $notification = Notification::find($this->notificationId);
@@ -48,10 +46,10 @@ class ProcessNotificationJob implements ShouldQueue {
             } else {
                 $notification->status = 'failed';
                 $notification->provider_response = $response['message'];
-                // Не помечаем как processed, если это постоянная ошибка, чтобы не спамить, 
+                // Не помечаем как processed, если это постоянная ошибка, чтобы не спамить,
                 // но и не retry-им, если ошибка фатальная (можно добавить логику классификации ошибок)
             }
-            
+
             $notification->save();
             DB::commit();
         } catch (\Exception $e) {
@@ -60,4 +58,17 @@ class ProcessNotificationJob implements ShouldQueue {
             throw $e; // Вернет джобу в очередь для retry согласно $backoff
         }
     }
+
+    /**
+     * Handle a job failure.
+     */
+    public function failed(\Throwable $exception, $payload = null)
+    {
+        // $payload contains the serialized data of the job
+        Log::error("Notification id {$this->notificationId} failed permanently.", [
+            'exception' => $exception->getMessage(),
+            'payload' => $payload
+        ]);
+    }
+
 }
