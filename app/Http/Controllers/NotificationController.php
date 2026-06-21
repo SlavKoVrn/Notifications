@@ -5,11 +5,12 @@ namespace App\Http\Controllers;
 use App\Jobs\ProcessNotificationJob;
 use App\Models\Notification;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 
 class NotificationController extends Controller {
-    
+
     // POST /api/v1/notifications/bulk
     public function sendBulk(Request $request) {
         $validated = $request->validate([
@@ -21,8 +22,8 @@ class NotificationController extends Controller {
             'recipients.*' => 'required|string',
         ]);
 
-        $queueName = $validated['priority'] === 'transactional' 
-            ? 'notifications_transactional' 
+        $queueName = $validated['priority'] === 'transactional'
+            ? 'notifications_transactional'
             : 'notifications_marketing';
 
         $createdCount = 0;
@@ -30,24 +31,34 @@ class NotificationController extends Controller {
         // Используем транзакцию для атомарного создания записей
         DB::transaction(function () use ($validated, $queueName, &$createdCount) {
             foreach ($validated['recipients'] as $recipient) {
-                // Попытка вставки. Если request_id + recipient уже есть, 
+                // Попытка вставки. Если request_id + recipient уже есть,
                 // уникальный индекс БД предотвратит дублирование (идемпотентность)
                 try {
-                    $notification = Notification::create([
+                    $playload = [
                         'request_id' => $validated['request_id'],
                         'recipient_id' => $recipient,
                         'channel' => $validated['channel'],
                         'message' => $validated['message'],
                         'priority' => $validated['priority'],
                         'status' => 'queued',
-                    ]);
+                    ];
+                    $notification = Notification::create($playload);
 
-                    ProcessNotificationJob::dispatch($notification->id)->onQueue($queueName);
+                    ProcessNotificationJob::dispatch($notification->id)
+                        ->onQueue($queueName)
+                        ->onConnection('rabbitmq')
+                        ->afterCommit();
+
+                    //app('queue')->connection('rabbitmq')->pushRaw(json_encode($playload), $queueName);
+
                     $createdCount++;
-                } catch (\Illuminate\Database\QueryException $e) {
-                    if ($e->getCode() === '23505') { // PostgreSQL unique violation
-                        continue; // Игнорируем дубликаты в рамках одного bulk-запроса
-                    }
+
+                } catch (\Exception $e) {
+
+                    Log::error('Notification dispatch failed for recipient: ' . $recipient, [
+                        'error' => $e->getMessage(),
+                        'request_id' => $validated['request_id']
+                    ]);
                     throw $e;
                 }
             }

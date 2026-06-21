@@ -2,9 +2,10 @@
 
 namespace App\Jobs;
 
-use App\Contracts\NotificationProviderInterface;
+use App\Providers\MockSmsProvider;
 use App\Models\Notification;
 use App\Services\IdempotencyService;
+
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -21,9 +22,11 @@ class ProcessNotificationJob implements ShouldQueue {
 
     public function __construct(public int $notificationId) {}
 
-    public function handle(NotificationProviderInterface $provider, IdempotencyService $idempotency) {
+    public function handle(IdempotencyService $idempotency) {
         $notification = Notification::find($this->notificationId);
         if (!$notification) return;
+
+        $provider = new MockSmsProvider;
 
         // 1. Проверка идемпотентности (защита от повторной обработки при retry)
         if ($idempotency->isProcessed($notification->request_id, $notification->recipient_id)) {
