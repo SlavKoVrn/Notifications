@@ -22,17 +22,19 @@ class ProcessNotificationJob implements ShouldQueue {
 
     public function __construct(public int $notificationId) {}
 
-    public function handle(IdempotencyService $idempotency) {
+    public function handle() {
         $notification = Notification::find($this->notificationId);
         if (!$notification) return;
 
         $provider = new MockSmsProvider;
 
         // 1. Проверка идемпотентности (защита от повторной обработки при retry)
+        /*
         if ($idempotency->isProcessed($notification->request_id, $notification->recipient_id)) {
             Log::info("Notification already processed (idempotency hit)", ['id' => $notification->id]);
             return;
         }
+        */
 
         DB::beginTransaction();
         try {
@@ -45,7 +47,7 @@ class ProcessNotificationJob implements ShouldQueue {
 
             if ($response['status'] === 'success') {
                 $notification->status = 'delivered';
-                $idempotency->markAsProcessed($notification->request_id, $notification->recipient_id);
+                //$idempotency->markAsProcessed($notification->request_id, $notification->recipient_id);
             } else {
                 $notification->status = 'failed';
                 $notification->provider_response = $response['message'];
